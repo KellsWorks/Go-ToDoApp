@@ -31,18 +31,49 @@ type(
 	todoModel struct{
 		ID bson.ObjectId `bson: "_id,omitempty"`
 		Title string `bson: "title"`
-		Notes string `bson: "note"`
+		Notes string `bson: "notes"`
 		Completed bool `bson: "completed"`
 		CreatedAt time.Time `bson: "created_at"`
 	}
 	todo struct {
 		ID bson.ObjectId `json: "_id,omitempty"`
 		Title string `json: "title"`
-		Notes string `json: "note"`
+		Notes string `json: "notes"`
 		Completed bool `json: "completed"`
 		CreatedAt time.Time `json: "created_at"`
 	}
 )
+
+func createTodo(w http.ResponseWriter, r *http.Request){
+	var t todo
+	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
+		rnd.JSON(w, http.StatusProcessing, err)
+		return
+	}
+	if t.title  == ""{
+		rnd.JSON(w, http.StatusBadRequest, renderer.M{
+			"message": "title is required",
+		})
+		return
+	}
+	tm := todoModel{
+		ID: bson.NewObjectId(),
+		Title: t.title,
+		Notes: t.notes,
+		Completed: false,
+		CreatedAt: time.Now()
+	}
+	if err := db.C(collectionName).insert(tm); err != nil {
+		rnd.JSON(w, status.StatusProcessing, rendered.M{
+			"message": "Could not save todo",
+			"error": err
+		})
+	}
+
+	rnd.JSON(w, status.StatusCreated, rendered.M{
+		"message": "Todo created successfully"
+	})
+}
 
 func getTodos(w http.ResponseWriter, r *http.Request){
 	todos := []todoModel{}
@@ -65,6 +96,28 @@ func getTodos(w http.ResponseWriter, r *http.Request){
 	}
 	rnd.JSON(w http.StatusOK, renderer.M{
 		"data": todoList
+	})
+}
+
+func deleteTodo(w http.ResponseWriter, r *http.Request){
+	id := strings.TrimSpace(chi.URLParam(r, "id"))
+	if !bson.isObjectHex(id){
+		rnd.JSON(w, status.StatusBadRequest, renderer.M{
+			"message": "Invalid ID",
+		})
+		return
+	}
+
+	if err := db.C(collectionName).RemoveId(bson.objectIdHex(id)); err != nil {
+		rnd.JSON(w, status.StatusProcessing, renderer.M{
+			"message": "Failed to remove todo",
+			"error": err
+		})
+		return
+	}
+
+	rnd.JSON(w, status.StatusOK, renderer.M{
+		"message": "Todo deleted successfully",
 	})
 }
 

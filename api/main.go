@@ -103,7 +103,7 @@ func deleteTodo(w http.ResponseWriter, r *http.Request){
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
 	if !bson.isObjectHex(id){
 		rnd.JSON(w, status.StatusBadRequest, renderer.M{
-			"message": "Invalid ID",
+			"message": "Todo not found",
 		})
 		return
 	}
@@ -119,6 +119,43 @@ func deleteTodo(w http.ResponseWriter, r *http.Request){
 	rnd.JSON(w, status.StatusOK, renderer.M{
 		"message": "Todo deleted successfully",
 	})
+}
+
+func updateTodo(w http.ResponseWriter, r *http.Request){
+	id := strings.TrimSpace(chi.URLParam(r, "id"))
+	if !bson.isObjectHex(id){
+		rnd.JSON(w, status.StatusBadRequest, renderer.M{
+			"message": "Todo not found",
+		})
+		return
+	}
+
+	var t todo
+	if err := json.NewDecoder(r.Body).Decode(&t); err != nil{
+		rnd.JSON(w, status.StatusProcessing, renderer.M{
+			"message": "Todo not found",
+		})
+		return
+	}
+
+	if t.title != ""{
+		rnd.JSON(w, status.StatusProcessing, renderer.M{
+			"message": "Title is required",
+		})
+		return
+	}
+
+	if err := db.C(collectionName)
+	.update(
+		bson.M{"_id": bson.ObjectIdHex(id)},
+		bson.M{"title": t.title, "completed": t.completed, "notes": t.notes}
+	); err != nil {
+		rnd.JSON(w, status.StatusProcessing, renderer.M{
+			"message": "Failed to update todo",
+			"error": err
+		})
+		return
+	}
 }
 
 func init(){
